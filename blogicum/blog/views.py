@@ -1,99 +1,182 @@
-from django.shortcuts import render, get_object_or_404
-from django.utils import timezone
-from .models import Post, Category
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.shortcuts import get_object_or_404, redirect
+from django.urls import reverse, reverse_lazy
+from django.db.models import Count
+from django.views.generic import (
+    CreateView,
+    DeleteView,
+    DetailView,
+    ListView,
+    UpdateView,
+)
+
+from .forms import CreateCommentForm, CreatePostForm
+from .models import Category, Comment, Post, User
+from .mixins import CommentEditMixin, PostsEditMixin, PostsQuerySetMixin
+
+PAGINATED_BY = 10
 
 
-# Create your views here.
+class PostDeleteView(PostsEditMixin, LoginRequiredMixin, DeleteView):
+    success_url = reverse_lazy("blog:index")
 
-# posts = [
-#     {
-#         'id': 0,
-#         'location': 'Остров отчаянья',
-#         'date': '30 сентября 1659 года',
-#         'category': 'travel',
-#         'text': '''Наш корабль, застигнутый в открытом море
-#                 страшным штормом, потерпел крушение.
-#                 Весь экипаж, кроме меня, утонул; я же,
-#                 несчастный Робинзон Крузо, был выброшен
-#                 полумёртвым на берег этого проклятого острова,
-#                 который назвал островом Отчаяния.''',
-#     },
-#     {
-#         'id': 1,
-#         'location': 'Остров отчаянья',
-#         'date': '1 октября 1659 года',
-#         'category': 'not-my-day',
-#         'text': '''Проснувшись поутру, я увидел, что наш корабль сняло
-#                 с мели приливом и пригнало гораздо ближе к берегу.
-#                 Это подало мне надежду, что, когда ветер стихнет,
-#                 мне удастся добраться до корабля и запастись едой и
-#                 другими необходимыми вещами. Я немного приободрился,
-#                 хотя печаль о погибших товарищах не покидала меня.
-#                 Мне всё думалось, что, останься мы на корабле, мы
-#                 непременно спаслись бы. Теперь из его обломков мы могли бы
-#                 построить баркас, на котором и выбрались бы из этого
-#                 гиблого места.''',
-#     },
-#     {
-#         'id': 2,
-#         'location': 'Остров отчаянья',
-#         'date': '25 октября 1659 года',
-#         'category': 'not-my-day',
-#         'text': '''Всю ночь и весь день шёл дождь и дул сильный
-#                 порывистый ветер. 25 октября.  Корабль за ночь разбило
-#                 в щепки; на том месте, где он стоял, торчат какие-то
-#                 жалкие обломки,  да и те видны только во время отлива.
-#                 Весь этот день я хлопотал  около вещей: укрывал и
-#                 укутывал их, чтобы не испортились от дождя.''',
-#     },
-# ]
+    def delete(self, request, *args, **kwargs):
+        post = get_object_or_404(Post, pk=self.kwargs["pk"])
+        if self.request.user != post.author:
+            return redirect("blog:index")
+
+        return super().delete(request, *args, **kwargs)
 
 
-# def index(request):
-#     return render(request, 'blog/index.html', {'posts': posts})
+class PostUpdateView(PostsEditMixin, LoginRequiredMixin, UpdateView):
+    form_class = CreatePostForm
+
+    def dispatch(self, request, *args, **kwargs):
+        post = get_object_or_404(Post, pk=self.kwargs["pk"])
+        if self.request.user != post.author:
+            return redirect("blog:post_detail", pk=self.kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
 
 
-# def post_detail(request, id):
-#     context = {
-#         'post': posts[id],
-#     }
-#     return render(request, 'blog/detail.html', context)
+class PostCreateView(PostsEditMixin, LoginRequiredMixin, CreateView):
+    form_class = CreatePostForm
+
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        return super().form_valid(form)
+
+    def get_success_url(self) -> str:
+        return reverse(
+            "blog:profile",
+            kwargs={
+                "username": self.request.user.username,
+            },
+        )
 
 
-# def category_posts(request, category_slug):
-#     return render(request, 'blog/category.html',
-#                   {'category_slug': category_slug})
+class CommentCreateView(LoginRequiredMixin, CreateView):
+    model = Comment
+    form_class = CreateCommentForm
+
+    def form_valid(self, form):
+        form.instance.post = get_object_or_404(Post, pk=self.kwargs["pk"])
+        form.instance.author = self.request.user
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse("blog:post_detail", kwargs={"pk": self.kwargs["pk"]})
 
 
-def index(request):
-    posts = Post.objects.filter(
-        pub_date__lte=timezone.now(),
-        is_published=True,
-        category__is_published=True
-    ).order_by('-pub_date')[:5]
-    return render(request, 'blog/index.html', {'post_list': posts})
+class CommentDeleteView(CommentEditMixin, LoginRequiredMixin, DeleteView):
+    def get_success_url(self):
+        return reverse("blog:post_detail", kwargs={"pk": self.kwargs["pk"]})
+
+    def delete(self, request, *args, **kwargs):
+        comment = get_object_or_404(Comment, pk=self.kwargs["comment_pk"])
+        if self.request.user != comment.author:
+            return redirect("blog:post_detail", pk=self.kwargs["pk"])
+        return super().delete(request, *args, **kwargs)
 
 
-def category_posts(request, category_slug):
-    category = get_object_or_404(
-        Category,
-        slug=category_slug,
-        is_published=True)
-    posts = Post.objects.filter(
-        category=category,
-        pub_date__lte=timezone.now(),
-        is_published=True
-    ).order_by('-pub_date').select_related('category')
-    return render(request, 'blog/category.html',
-                  {'category': category, 'post_list': posts})
+class CommentUpdateView(CommentEditMixin, LoginRequiredMixin, UpdateView):
+    form_class = CreateCommentForm
+
+    def dispatch(self, request, *args, **kwargs):
+        if (
+            self.request.user
+            != Comment.objects.get(pk=self.kwargs["comment_pk"]).author
+        ):
+            return redirect("blog:post_detail", pk=self.kwargs["pk"])
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_success_url(self):
+        return reverse("blog:post_detail", kwargs={"pk": self.kwargs["pk"]})
 
 
-def post_detail(request, pk):
-    post = get_object_or_404(
-        Post,
-        pk=pk,
-        pub_date__lte=timezone.now(),
-        is_published=True,
-        category__is_published=True
-    )
-    return render(request, 'blog/detail.html', {'post': post})
+class AuthorProfileListView(PostsQuerySetMixin, ListView):
+    model = Post
+    template_name = "blog/profile.html"
+    paginate_by = PAGINATED_BY
+
+    def get_queryset(self):
+        if self.request.user.username == self.kwargs["username"]:
+            return (
+                self.request.user.posts.select_related(
+                    "category",
+                    "author",
+                    "location",
+                )
+                .all()
+                .annotate(comment_count=Count("comments"))
+                .order_by('-pub_date')
+            )
+
+        return (
+            super()
+            .get_queryset()
+            .filter(author__username=self.kwargs["username"])
+            .annotate(comment_count=Count("comments"))
+            .order_by('-pub_date')
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["profile"] = get_object_or_404(
+            User, username=self.kwargs["username"]
+        )
+        return context
+
+
+class BlogIndexListView(PostsQuerySetMixin, ListView):
+    model = Post
+    template_name = "blog/index.html"
+    context_object_name = "post_list"
+    paginate_by = PAGINATED_BY
+
+    def get_queryset(self):
+        return super().get_queryset().annotate(comment_count=Count("comments"))
+
+
+class BlogCategoryListView(PostsQuerySetMixin, ListView):
+    model = Post
+    template_name = "blog/category.html"
+    context_object_name = "post_list"
+    paginate_by = PAGINATED_BY
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["category"] = get_object_or_404(
+            Category, slug=self.kwargs["category_slug"], is_published=True
+        )
+        return context
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .filter(category__slug=self.kwargs["category_slug"])
+            .annotate(comment_count=Count("comments"))
+        )
+
+
+class PostDetailView(PostsQuerySetMixin, DetailView):
+    model = Post
+    template_name = "blog/detail.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["form"] = CreateCommentForm()
+        context["comments"] = (
+            self.get_object().comments.prefetch_related("author").all()
+        )
+        return context
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .prefetch_related(
+                "comments",
+            )
+        )
