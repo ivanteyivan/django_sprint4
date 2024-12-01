@@ -332,4 +332,14 @@ class CommentDeleteView(CommentMixinView, DeleteView):
     CommentMixinView: Базовый класс, предоставляющий функциональность.
     """
 
-    ...
+    template_name = "blog/comment.html"
+
+    def get_success_url(self):
+        pk = self.kwargs["pk"]
+        return reverse("blog:post_detail", kwargs={"pk": pk})
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if 'form' in context:
+            del context['form']
+        return context
