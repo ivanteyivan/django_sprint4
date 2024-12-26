@@ -1,3 +1,4 @@
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.mail import send_mail
 from django.shortcuts import get_object_or_404, redirect
@@ -16,36 +17,15 @@ from core.mixins import CommentMixinView
 from .models import Post, User, Category, Comment
 from .forms import UserEditForm, PostEditForm, CommentEditForm
 
-
 class MainPostListView(ListView):
-    """Главная страница со списком постов.
-
-    Attributes:
-        - model: Класс модели, используемой для получения данных.
-        - template_name: Имя шаблона, используемого для отображения страницы.
-        - queryset: Запрос, определяющий список постов для отображения.
-        - paginate_by: Количество постов, отображаемых на одной странице.
-    """
-
+    """Главная страница со списком постов."""
     model = Post
     template_name = "blog/index.html"
     queryset = post_published_query()
     paginate_by = 10
 
-
 class CategoryPostListView(MainPostListView):
-    """Страница со списком постов выбранной категории.
-
-    Атрибуты:
-        - template_name: Имя шаблона, используемого для отображения страницы.
-        - category: Выбранная категория.
-
-    Методы:
-        - get_queryset(): Возвращает список постов в выбранной категории.
-        - get_context_data(**kwargs): Возвращает контекстные данные для
-        шаблона.
-    """
-
+    """Страница со списком постов выбранной категории."""
     template_name = "blog/category.html"
     category = None
 
@@ -61,20 +41,8 @@ class CategoryPostListView(MainPostListView):
         context["category"] = self.category
         return context
 
-
 class UserPostsListView(MainPostListView):
-    """Страница со списком постов пользователя.
-
-    Атрибуты:
-        - template_name: Имя шаблона, используемого для отображения страницы.
-        - author: Автор постов.
-
-    Методы:
-        - get_queryset(): Возвращает список постов автора.
-        - get_context_data(**kwargs): Возвращает контекстные данные для
-        шаблона.
-    """
-
+    """Страница со списком постов пользователя."""
     template_name = "blog/profile.html"
     author = None
 
@@ -90,22 +58,8 @@ class UserPostsListView(MainPostListView):
         context["profile"] = self.author
         return context
 
-
 class PostDetailView(DetailView):
-    """Страница выбранного поста.
-
-    Атрибуты:
-        - model: Класс модели, используемой для получения данных.
-        - template_name: Имя шаблона, используемого для отображения страницы.
-        - post_data: Объект поста.
-
-    Методы:
-        - get_queryset(): Возвращает пост.
-        - get_context_data(**kwargs): Возвращает контекстные данные для
-        шаблона.
-        - check_post(): Возвращает результат проверки поста.
-    """
-
+    """Страница выбранного поста."""
     model = Post
     template_name = "blog/detail.html"
     post_data = None
@@ -136,23 +90,8 @@ class PostDetailView(DetailView):
             )
         )
 
-
 class UserProfileUpdateView(LoginRequiredMixin, UpdateView):
-    """Обновление профиля пользователя.
-
-    Атрибуты:
-        - model: Класс модели, используемой для получения данных.
-        - form_class: Класс формы, используемый для обновления профиля
-        пользователя.
-        - template_name: Имя шаблона, используемого для отображения страницы.
-
-    Методы:
-        - get_object(queryset=None): Возвращает объект пользователя для
-        обновления.
-        - get_success_url(): Возвращает URL-адрес для перенаправления после
-        успешного обновления профиля.
-    """
-
+    """Обновление профиля пользователя."""
     model = User
     form_class = UserEditForm
     template_name = "blog/user.html"
@@ -164,22 +103,8 @@ class UserProfileUpdateView(LoginRequiredMixin, UpdateView):
         username = self.request.user
         return reverse("blog:profile", kwargs={"username": username})
 
-
 class PostCreateView(LoginRequiredMixin, CreateView):
-    """Создание поста.
-
-    Атрибуты:
-        - model: Класс модели, используемой для создания поста.
-        - form_class: Класс формы, используемый для создания поста.
-        - template_name: Имя шаблона, используемого для отображения страницы.
-
-    Методы:
-        - form_valid(form): Проверяет, является ли форма допустимой,
-        и устанавливает автора поста.
-        - get_success_url(): Возвращает URL-адрес для перенаправления после
-        успешного создания поста.
-    """
-
+    """Создание поста."""
     model = Post
     form_class = PostEditForm
     template_name = "blog/create.html"
@@ -192,22 +117,8 @@ class PostCreateView(LoginRequiredMixin, CreateView):
         username = self.request.user
         return reverse("blog:profile", kwargs={"username": username})
 
-
 class PostUpdateView(LoginRequiredMixin, UpdateView):
-    """Редактирование поста.
-
-    Атрибуты:
-        - model: Класс модели, используемой для редактирования поста.
-        - form_class: Класс формы, используемый для редактирования поста.
-        - template_name: Имя шаблона, используемого для отображения страницы.
-
-    Методы:
-        - dispatch(request, *args, **kwargs): Проверяет, является ли
-        пользователь автором поста.
-        - get_success_url(): Возвращает URL-адрес перенаправления после
-        успешного редактирования поста.
-    """
-
+    """Редактирование поста."""
     model = Post
     form_class = PostEditForm
     template_name = "blog/create.html"
@@ -221,23 +132,8 @@ class PostUpdateView(LoginRequiredMixin, UpdateView):
         pk = self.kwargs["pk"]
         return reverse("blog:post_detail", kwargs={"pk": pk})
 
-
 class PostDeleteView(LoginRequiredMixin, DeleteView):
-    """Удаление поста.
-
-    Атрибуты:
-        - model: Класс модели, используемой для удаления поста.
-        - template_name: Имя шаблона, используемого для отображения страницы.
-
-    Методы:
-        - dispatch(request, *args, **kwargs): Проверяет, является ли
-        пользователь автором поста.
-        - get_context_data(**kwargs): Возвращает контекстные данные для
-        шаблона.
-        - get_success_url(): Возвращает URL-адрес перенаправления после
-        успешного удаления поста.
-    """
-
+    """Удаление поста."""
     model = Post
     template_name = "blog/create.html"
 
@@ -255,26 +151,8 @@ class PostDeleteView(LoginRequiredMixin, DeleteView):
         username = self.request.user
         return reverse_lazy("blog:profile", kwargs={"username": username})
 
-
 class CommentCreateView(LoginRequiredMixin, CreateView):
-    """Создание комментария.
-
-    Атрибуты:
-        - model: Класс модели, используемой для создания комментария.
-        - form_class: Класс формы, используемый для создания комментария.
-        - template_name: Имя шаблона, используемого для отображения страницы.
-        - post_data: Объект поста, к которому создается комментарий.
-
-    Методы:
-        - dispatch(request, *args, **kwargs): Получает объект поста.
-        - form_valid(form): Проверяет, является ли форма допустимой,
-        и устанавливает автора комментария.
-        - get_success_url(): Возвращает URL-адрес перенаправления после
-        успешного создания комментария.
-        - send_author_email(): Отправляет email автору поста, при добавлении
-        комментария.
-    """
-
+    """Создание комментария."""
     model = Comment
     form_class = CommentEditForm
     template_name = "blog/comment.html"
@@ -312,26 +190,12 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
             fail_silently=True,
         )
 
-
 class CommentUpdateView(CommentMixinView, UpdateView):
-    """Редактирование комментария.
-
-    CommentMixinView: Базовый класс, предоставляющий функциональность.
-
-    Атрибуты:
-        - form_class: Класс формы, используемый для редактирования
-        комментария.
-    """
-
+    """Редактирование комментария."""
     form_class = CommentEditForm
 
-
 class CommentDeleteView(CommentMixinView, DeleteView):
-    """Удаление комментария.
-
-    CommentMixinView: Базовый класс, предоставляющий функциональность.
-    """
-
+    """Удаление комментария."""
     template_name = "blog/comment.html"
 
     def get_success_url(self):
