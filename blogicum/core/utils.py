@@ -1,9 +1,8 @@
+from django.core.paginator import Paginator
 from django.db.models import Count
 from django.shortcuts import get_object_or_404
-
-from blog.models import Post
 from django.utils import timezone
-
+from blog.models import Post
 
 def post_all_query():
     """Вернуть все посты."""
@@ -18,7 +17,6 @@ def post_all_query():
     )
     return query_set
 
-
 def post_published_query():
     """Вернуть опубликованные посты."""
     query_set = post_all_query().filter(
@@ -28,6 +26,12 @@ def post_published_query():
     )
     return query_set
 
+def get_paginated_posts(page_number, items_per_page):
+    """Вернуть страницу пагинатора с опубликованными постами."""
+    query_set = post_published_query()
+    paginator = Paginator(query_set, items_per_page)
+    page = paginator.get_page(page_number)
+    return page
 
 def get_post_data(post_data):
     """Вернуть данные поста.
